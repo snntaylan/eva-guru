@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 import { fetchRequest } from '@/services/api.service';
 import { store } from '@/store';
 import { getUserInfo } from '@/utils/helpers';
@@ -9,12 +9,16 @@ import { useStore } from 'vuex';
 export default defineComponent({
   setup() {
     const store = useStore();
-    let skus = [];
+    let allSKUs = [];
+    let visibleSKUs = [];
     let refunds = [];
+    const pageSize = 10;
 
     return {
       store,
-      skus,
+      visibleSKUs,
+      allSKUs,
+      pageSize,
       refunds
     }
   },
@@ -47,7 +51,7 @@ export default defineComponent({
           body: {
             "marketplace": userInfo?.user?.store?.[0]?.marketplaceName,
             "sellerId": userInfo?.user?.store?.[0]?.storeId,
-            "skuList": this.skus.map(x => x.sku),
+            "skuList": this.allSKUs.map(x => x.sku),
             "requestedDay": store.state.requestedDays
           }
         });
@@ -59,6 +63,23 @@ export default defineComponent({
     formatDate(date, format) {
       return moment(date).format(format);
     },
+    getRefundRate(sku) {
+      return this.refunds.find(x => x.sku === sku)?.refundRate;
+    },
+    changePage(pageNumber) {
+      const startIndex = (pageNumber - 1) * 10;
+      const endIndex = (pageNumber) * 10;
+      this.visibleSKUs = [...this.allSKUs.slice(startIndex, endIndex)];
+      this.$forceUpdate();
+    },
+    getPagesList() {
+      let pages = [];
+      let maxPages = Math.ceil(this.allSKUs.length / this.pageSize);
+      for (let index = 0; index < maxPages; index++) {
+        pages.push(index+1)
+      }
+      return pages;
+    },
     consoleLog(data) {
       console.log(data, "DATA from fromtend")
     },
@@ -67,9 +88,9 @@ export default defineComponent({
       if (!store.state.column1Date) return true;
         
       this.getSKUData().then(async (skuData) => {
-        
-        console.log(skuData)
-        this.skus = [...skuData.Data.item.skuList];
+        const a = [];
+        this.visibleSKUs = skuData.Data.item.skuList.slice(0, 10);
+        this.allSKUs = [...skuData.Data.item.skuList];
 
         this.getSKURefundData().then((refundData) => {
           this.refunds = [...refundData.Data]
@@ -99,46 +120,58 @@ export default defineComponent({
 </script>
 
 <template>
-  <table v-if="store.state.column1Date">
-    <thead>
-      <tr>
-        <th>SKU</th>
-        <th>Product Name</th>
-        <th>
-          {{formatDate(store.state.column1Date, 'dddd')}} <br />
-          {{  formatDate(store.state.column1Date, 'DD-MM-YYYY')  }} <br />
-          Sales / Units <br />
-          Avg. Selling Price
-        </th>
-        <th>
-          {{formatDate(store.state.column2Date, 'dddd')}} <br />
-          {{ formatDate(store.state.column2Date, 'DD-MM-YYYY') }} <br />
-          Sales / Units <br />
-          Avg. Selling Price
-        </th>
-        <th>
-          SKU Refund Rate
-          (Last 60 days)
-        </th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr v-for="(item, index) in skus">
-        {{ consoleLog(item) }}
-        <td>{{item.sku}}</td>
-        <td>{{item.productName}}</td>
-        <td>
-          {{ item.amount }} / {{ item.qty }} <br />
-          {{ (item.amount / item.qty).toFixed(2) || "0" }}
-        </td>
-        <td>
-          {{ item.amount2 }} / {{ item.qty2 }} <br />
-          {{ (item.amount2 / item.qty2).toFixed(2) || "0" }}
-        </td>
-        <td>
-          {{ refunds[index].refundRate }}%
-        </td>
-      </tr>
-    </tbody>
-  </table>
+  <div class="table-wrapper p-4">
+    <table v-if="store.state.column1Date">
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Product Name</th>
+          <th style="color: cadetblue">
+            {{formatDate(store.state.column1Date, 'dddd')}} <br />
+            {{  formatDate(store.state.column1Date, 'DD-MM-YYYY')  }} <br />
+            Sales / Units <br />
+            Avg. Selling Price
+          </th>
+          <th style="color: green">
+            {{formatDate(store.state.column2Date, 'dddd')}} <br />
+            {{ formatDate(store.state.column2Date, 'DD-MM-YYYY') }} <br />
+            Sales / Units <br />
+            Avg. Selling Price
+          </th>
+          <th>
+            SKU Refund Rate
+            (Last 60 days)
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(item, index) in visibleSKUs">
+          <td>{{item.sku}}</td>
+          <td>{{item.productName}}</td>
+          <td>
+            {{ item.amount }} / {{ item.qty }} <br />
+            {{ (item.amount / item.qty) ? (item.amount / item.qty).toFixed(2) : "0" }}
+          </td>
+          <td>
+            {{ item.amount2 }} / {{ item.qty2 }} <br />
+            {{ (item.amount2 / item.qty2) ? (item.amount2 / item.qty2).toFixed(2) : "0" }}
+          </td>
+          <td>
+            {{ getRefundRate(item.sku) }}%
+          </td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="5">
+            <ul class="flex gap-3">
+              <li v-for="item in getPagesList()">
+                <button class="flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600" @click="() => changePage(item)">{{ item }}</button>
+              </li>
+            </ul>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
 </template>

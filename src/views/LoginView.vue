@@ -20,12 +20,13 @@ async function onFormSubmit(ev: SubmitEvent) {
   const tokenInfo = await submitLogin();
   
   if (tokenInfo.ApiStatusCode === 200) {
-    const userInfo = await getUserInfo();
-
+    
     let instance = $toast.success('User successfully logged in!');
     localStorage.setItem('accessToken', tokenInfo.Data.AccessToken)
     localStorage.setItem('tokenExpiresAt', tokenInfo.Data.ExpiresAt)
     localStorage.setItem('refreshToken', tokenInfo.Data.RefreshToken)
+    
+    const userInfo = await getUserInfo();
     
     localStorage.setItem('userInfo', JSON.stringify(userInfo.Data))
 
